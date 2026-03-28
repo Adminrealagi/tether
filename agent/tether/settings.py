@@ -198,6 +198,58 @@ class Settings:
         return _get_int("TETHER_AGENT_TURN_TIMEOUT_SECONDS", default=0)
 
     # -------------------------------------------------------------------------
+    # SSH Access Settings
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def ssh_enabled() -> bool:
+        """Enable the optional SSH control server.
+
+        Env: TETHER_SSH_ENABLED (default: 0)
+        """
+        return _get_bool("TETHER_SSH_ENABLED", default=False)
+
+    @staticmethod
+    def ssh_host() -> str:
+        """Host to bind the SSH control server to.
+
+        Env: TETHER_SSH_HOST (default: 0.0.0.0)
+        """
+        return _get("TETHER_SSH_HOST", default="0.0.0.0")
+
+    @staticmethod
+    def ssh_port() -> int:
+        """Port to bind the SSH control server to.
+
+        Env: TETHER_SSH_PORT (default: 8822)
+        """
+        return _get_int("TETHER_SSH_PORT", default=8822)
+
+    @staticmethod
+    def ssh_host_key_path() -> str:
+        """Path to the SSH host private key.
+
+        Env: TETHER_SSH_HOST_KEY_PATH
+        Default: <data_dir>/ssh_host_ed25519_key
+        """
+        configured = _get("TETHER_SSH_HOST_KEY_PATH")
+        if configured:
+            return os.path.abspath(configured)
+        return os.path.join(settings.data_dir(), "ssh_host_ed25519_key")
+
+    @staticmethod
+    def ssh_authorized_keys_path() -> str:
+        """Path to the authorized client public keys file.
+
+        Env: TETHER_SSH_AUTHORIZED_KEYS_PATH
+        Default: <data_dir>/ssh_authorized_keys
+        """
+        configured = _get("TETHER_SSH_AUTHORIZED_KEYS_PATH")
+        if configured:
+            return os.path.abspath(configured)
+        return os.path.join(settings.data_dir(), "ssh_authorized_keys")
+
+    # -------------------------------------------------------------------------
     # Claude Runner Settings
     # -------------------------------------------------------------------------
 

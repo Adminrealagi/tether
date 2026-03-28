@@ -2,7 +2,7 @@
 
 The open source supervision layer for local AI coding agents.
 
-You run Claude Code, Codex, OpenCode, or Pi in your terminal. Tether sits alongside and lets you watch and control those sessions from anywhere: a mobile-first web UI, or Telegram, Slack, and Discord threads with live output and approval buttons.
+You run Claude Code, Codex, OpenCode, or Pi in your terminal. Tether sits alongside and lets you watch and control those sessions from anywhere: a mobile-first web UI, Telegram/Slack/Discord threads, or an SSH control prompt with key-based auth.
 
 ```
 Claude Code / Codex / OpenCode / Pi
@@ -11,7 +11,7 @@ Claude Code / Codex / OpenCode / Pi
       Tether (local)
         |             |
         v             v
-   Web UI (PWA)   Telegram / Slack / Discord
+   Web UI (PWA)   Telegram / Slack / Discord / SSH
 ```
 
 ## The typical workflow
@@ -57,6 +57,12 @@ Bridge dependencies are optional extras:
 
 ```bash
 pip install tether-ai[telegram]   # or [slack] or [discord]
+```
+
+SSH access is also optional:
+
+```bash
+pip install tether-ai[ssh]
 ```
 
 Node.js is required for the Codex and OpenCode adapters. The sidecar bundles are included in the package and started automatically.
@@ -106,6 +112,29 @@ Configure credentials in `~/.config/tether/config.env` (or `.env` in the project
 | Discord  | `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID` |
 
 Telegram requires a supergroup with Topics enabled. Each session gets its own topic. Commands work in the General topic: `/list`, `/attach`, `/new`, `/help`.
+
+## SSH access
+
+SSH access gives you a remote command prompt for listing sessions, watching output,
+sending input, interrupting runs, and resolving permission requests without opening the web UI.
+
+Required config:
+
+```bash
+TETHER_SSH_ENABLED=1
+TETHER_SSH_PORT=8822
+TETHER_SSH_HOST_KEY_PATH=~/.local/share/tether/ssh_host_ed25519_key
+TETHER_SSH_AUTHORIZED_KEYS_PATH=~/.local/share/tether/ssh_authorized_keys
+```
+
+Add one or more public keys to `TETHER_SSH_AUTHORIZED_KEYS_PATH`, then connect:
+
+```bash
+ssh -p 8822 localhost
+ssh -p 8822 localhost 'list'
+```
+
+Commands available over SSH: `help`, `list`, `pending`, `input`, `interrupt`, `approve`, `watch`.
 
 ## Adapters
 
@@ -199,9 +228,11 @@ TETHER_AGENT_TOKEN=               # auth token (required in non-dev mode)
 TETHER_DEFAULT_AGENT_ADAPTER=     # default adapter for new sessions (optional)
 TETHER_AGENT_HOST=0.0.0.0         # bind address
 TETHER_AGENT_PORT=8787            # port
+TETHER_SSH_ENABLED=0              # optional SSH control server
+TETHER_SSH_PORT=8822              # SSH port
 ```
 
-See `.env.example` for the full reference.
+See [.env.example](/home/standart/subprojects/tether/.env.example) and [docs/SSH_ACCESS.md](/home/standart/subprojects/tether/docs/SSH_ACCESS.md) for the full reference.
 
 ## Development
 

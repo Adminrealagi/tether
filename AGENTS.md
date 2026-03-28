@@ -43,6 +43,7 @@ Read the relevant docs below based on what you'll be working on.
 | --- | --- | --- |
 | Session engine | `docs/SESSION_ENGINE.md` | Store, state machine, event pipeline, locking |
 | Bridges | `docs/BRIDGES.md` | Telegram/Slack/Discord, subscriber routing, auto-approve |
+| SSH access | `docs/SSH_ACCESS.md` | AsyncSSH control prompt, auth keys, command surface |
 | Runners | `docs/RUNNERS.md` | Runner protocol, adapters (claude_subprocess, codex, litellm, etc.) |
 | Web UI | `docs/WEB_UI.md` | Vue 3 frontend, views, composables, dev server |
 | MCP server | `docs/MCP_SERVER.md` | MCP tools, transport, config |

@@ -32,6 +32,7 @@ graph TB
         TG[Telegram]
         SL[Slack]
         DC[Discord]
+        SSH[SSH Control]
     end
 
     EA1 & EA2 -->|MCP tools| MCP
@@ -43,6 +44,8 @@ graph TB
     SE --> Store
     Store -->|all events, unfiltered| SSE --> VUE
     Store -->|subscriber queue| BS -->|filtered: final output, approvals, state| TG & SL & DC
+    API --> SSH
+    Store --> SSH
 
     VUE -->|REST calls| API
     TG & SL & DC -->|REST calls| API
@@ -53,7 +56,7 @@ which broadcasts to subscriber queues. Two independent consumers read those queu
 SSE stream (raw passthrough for the web UI) and bridge subscribers (filtered, server-side
 rendering for messaging platforms). All consumers send input back through the same REST API.
 
-See: [Runners](RUNNERS.md) · [Session Engine](SESSION_ENGINE.md) · [Bridges](BRIDGES.md) · [Web UI](WEB_UI.md) · [MCP Server](MCP_SERVER.md)
+See: [Runners](RUNNERS.md) · [Session Engine](SESSION_ENGINE.md) · [Bridges](BRIDGES.md) · [Web UI](WEB_UI.md) · [MCP Server](MCP_SERVER.md) · [SSH Access](SSH_ACCESS.md)
 
 ## Event Flow
 

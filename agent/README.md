@@ -8,7 +8,7 @@
 The open source infra layer between your local coding agents and messaging apps.
 
 Tether runs on your machine and turns agent runs into something you can *supervise* from anywhere:
-a mobile friendly web UI plus messaging bridges (Telegram, Slack, Discord) with approvals, input
+a mobile friendly web UI plus messaging bridges (Telegram, Slack, Discord) and SSH access with approvals, input
 prompts, and live output streaming.
 
 If you're running Claude Code, Codex, OpenCode, or Pi locally and you want supervision (logs, state, diffs, approvals) in the places you
@@ -21,7 +21,7 @@ Claude Code / Codex / OpenCode / Pi / custom agent
       Tether (local control plane)
         |             |
         v             v
-   Web UI (PWA)   Telegram/Slack/Discord
+   Web UI (PWA)   Telegram/Slack/Discord/SSH
 ```
 
 ## How it works
@@ -47,10 +47,11 @@ Claude Code / Codex / OpenCode / Pi / custom agent
 2. Human in the loop: approve tool use, provide input, review diffs
 3. Observable: live streaming output and explicit session state (web and messaging)
 4. Messaging bridges: Telegram, Slack, and Discord with approvals and auto approve
-5. Multi adapter: Claude Code (OAuth or API key), Codex via sidecar, OpenCode via sidecar, Pi coding agent, plus LiteLLM (experimental)
-6. External agent API: MCP server and REST API for custom agents and integrations
-7. Mobile first UI: PWA dashboard for monitoring and controlling sessions (experimental)
-8. CLI client: manage sessions, attach external agents, and send input from your terminal
+5. SSH access: key-authenticated remote control for list/watch/input/approve flows
+6. Multi adapter: Claude Code (OAuth or API key), Codex via sidecar, OpenCode via sidecar, Pi coding agent, plus LiteLLM (experimental)
+7. External agent API: MCP server and REST API for custom agents and integrations
+8. Mobile first UI: PWA dashboard for monitoring and controlling sessions (experimental)
+9. CLI client: manage sessions, attach external agents, and send input from your terminal
 
 ## Quick Start
 
@@ -185,6 +186,32 @@ Install bridge dependencies:
 ```bash
 pip install tether-ai[telegram]   # or [slack] or [discord]
 ```
+
+Install SSH support:
+```bash
+pip install tether-ai[ssh]
+```
+
+## SSH Access
+
+SSH access exposes a remote prompt for the existing control-plane actions. It is
+key-authenticated and does not spawn a host shell.
+
+Configure:
+```bash
+TETHER_SSH_ENABLED=1
+TETHER_SSH_PORT=8822
+TETHER_SSH_HOST_KEY_PATH=~/.local/share/tether/ssh_host_ed25519_key
+TETHER_SSH_AUTHORIZED_KEYS_PATH=~/.local/share/tether/ssh_authorized_keys
+```
+
+Add public keys to `TETHER_SSH_AUTHORIZED_KEYS_PATH`, then connect:
+```bash
+ssh -p 8822 localhost
+ssh -p 8822 localhost 'list'
+```
+
+SSH commands: `help`, `list`, `pending`, `input`, `interrupt`, `approve`, `watch`.
 
 ## CLI
 

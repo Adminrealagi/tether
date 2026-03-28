@@ -41,9 +41,11 @@ from tether.bridges.glue import (
     on_session_bound,
     get_sessions_for_restore,
 )
+from tether.ssh.server import SSHControlServer
 
 configure_logging()
 logger = structlog.get_logger(__name__)
+ssh_server = SSHControlServer()
 
 
 @asynccontextmanager
@@ -56,6 +58,7 @@ async def lifespan(app: FastAPI):
 
         await ensure_opencode_sidecar_started()
     await _init_bridges()
+    await _init_ssh_access()
     _subscribe_existing_sessions()
     maintenance_task = asyncio.create_task(maintenance_loop())
     log_ui_urls(port=settings.port())
@@ -176,6 +179,7 @@ async def _init_bridges() -> None:
 async def _shutdown_services() -> None:
     """Stop bridges and managed sidecars."""
     await _stop_bridges()
+    await _stop_ssh_access()
     if settings.opencode_sidecar_managed():
         from tether.runner.opencode_sidecar_manager import (
             stop_managed_opencode_sidecar,
@@ -193,6 +197,25 @@ async def _stop_bridges() -> None:
                 await bridge.stop()
             except Exception:
                 logger.exception("Failed to stop bridge", platform=platform)
+
+
+async def _init_ssh_access() -> None:
+    """Initialize the optional SSH control server."""
+    if not settings.ssh_enabled():
+        return
+
+    try:
+        await ssh_server.start()
+    except Exception:
+        logger.exception("Failed to initialize SSH access")
+
+
+async def _stop_ssh_access() -> None:
+    """Stop the optional SSH control server."""
+    try:
+        await ssh_server.stop()
+    except Exception:
+        logger.exception("Failed to stop SSH access")
 
 
 def _subscribe_existing_sessions() -> None:
