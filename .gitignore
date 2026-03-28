@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.coverage
+
+# Virtual environments
+.venv/
+agent/.venv/
+
+# Node
+node_modules/
+ui/node_modules/
+ui/dist/
+ui/dev-dist/
+
+# Built stuff
+agent/tether/static_ui/
+agent/tether/sidecars/*.mjs
+agent/dist/
+
+# Agent data
+agent/data/
+
+# Misc
+.DS_Store
+.env
+.mcp.json
+agent/agent/
+tether.log
+docker.env
+.idea
+.run/
+.pi/
+
+# Bridge state files (created by tests without tmp_path)
+discord_threads.json
+discord_pairing.json
+slack_threads.json
+
+# Reference data
+codex-src
+background
+# Ignore historical docs that may reappear locally
+EXTERNAL_AGENT_IMPLEMENTATION.md
+AGENT_TETHER_EXTRACTION.md
+agent/build/

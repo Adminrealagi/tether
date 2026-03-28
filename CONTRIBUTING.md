@@ -1,0 +1,76 @@
+# Contributing
+
+## Requirements
+
+- Python 3.10+
+- Node.js 20+
+
+## Development Setup
+
+### Quick Start
+
+```bash
+# Install all dependencies
+make install
+
+# Terminal 1: Run agent
+cd agent && python -m tether.main
+
+# Terminal 2: Run UI with hot reload
+make dev-ui
+```
+
+Open http://localhost:5173 (Vite dev server proxies API to agent).
+
+### Agent (Python)
+
+```bash
+cd agent
+python -m venv .venv
+. .venv/bin/activate
+pip install -e ".[dev]"
+
+# Run agent
+python -m tether.main
+
+# Run tests
+pytest
+```
+
+### UI (Vue)
+
+```bash
+cd ui
+npm install
+npm run dev      # Dev server with hot reload
+npm run build    # Production build
+npm test         # Run tests
+```
+
+### With Codex Sidecar
+
+```bash
+# Terminal 1: Start sidecar locally
+make install-codex
+cd codex-sdk-sidecar && DOTENV_CONFIG_PATH=../.env npm run start
+
+# Terminal 2: Run agent with TETHER_DEFAULT_AGENT_ADAPTER=codex_sdk_sidecar
+TETHER_DEFAULT_AGENT_ADAPTER=codex_sdk_sidecar python -m tether.main
+```
+
+## Commands
+
+```bash
+make install      # Install Python and Node dependencies
+make start        # Build UI and run agent
+make start-codex  # Build UI, start sidecar, run agent
+make dev-ui       # Run UI dev server (hot reload)
+make test         # Run agent tests
+```
+
+## Code Style
+
+See [background/CODE_STANDARDS.md](background/CODE_STANDARDS.md) for style guidelines.
+
+- Python: Format with Black (`cd agent && python -m black .`)
+- Commits: Single-line, sentence case, no AI attribution
