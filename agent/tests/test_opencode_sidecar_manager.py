@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -79,3 +80,57 @@ def test_resolve_falls_back_to_source_tree(monkeypatch):
     # In the dev layout, opencode-sdk-sidecar/ exists in the repo.
     assert "--prefix" in result
     assert "start" in result
+
+
+def test_resolve_managed_xdg_data_home_preserves_default_when_writable(
+    monkeypatch, tmp_path
+):
+    from tether.runner.opencode_sidecar_manager import _resolve_managed_xdg_data_home
+
+    monkeypatch.setattr(
+        "tether.runner.opencode_sidecar_manager.Path.home",
+        lambda: tmp_path,
+    )
+
+    data_home = tmp_path / ".local" / "share"
+    data_home.mkdir(parents=True)
+
+    assert _resolve_managed_xdg_data_home({}) is None
+
+
+def test_resolve_managed_xdg_data_home_preserves_configured_value_when_writable(
+    tmp_path,
+):
+    from tether.runner.opencode_sidecar_manager import _resolve_managed_xdg_data_home
+
+    data_home = tmp_path / "custom-data"
+    data_home.mkdir()
+
+    assert _resolve_managed_xdg_data_home({"XDG_DATA_HOME": str(data_home)}) is None
+
+
+def test_resolve_managed_xdg_data_home_falls_back_when_default_not_usable(
+    monkeypatch, tmp_path
+):
+    from tether.runner.opencode_sidecar_manager import _resolve_managed_xdg_data_home
+
+    blocked_home = tmp_path / "blocked-home"
+    blocked_home.mkdir()
+
+    monkeypatch.setattr(
+        "tether.runner.opencode_sidecar_manager.Path.home",
+        lambda: blocked_home,
+    )
+    monkeypatch.setattr(
+        "tether.settings.settings.data_dir",
+        staticmethod(lambda: str(tmp_path / "tether-data")),
+    )
+    monkeypatch.setattr(
+        "tether.runner.opencode_sidecar_manager.os.access",
+        lambda _path, _mode: False,
+    )
+
+    fallback = _resolve_managed_xdg_data_home({})
+
+    assert fallback == str(tmp_path / "tether-data" / "opencode_managed")
+    assert Path(fallback).is_dir()

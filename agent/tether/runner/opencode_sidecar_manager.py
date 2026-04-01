@@ -13,6 +13,7 @@ import shutil
 import shlex
 import socket
 import urllib.parse
+from collections.abc import Mapping
 from pathlib import Path
 
 import structlog
@@ -61,11 +62,13 @@ async def _spawn_locked() -> None:
     env["TETHER_OPENCODE_SIDECAR_HOST"] = url.hostname or "127.0.0.1"
     env["TETHER_OPENCODE_SIDECAR_PORT"] = str(url.port or 8790)
 
-    # OpenCode writes logs/state under XDG_DATA_HOME. In restricted environments
-    # ~/.local/share may not be writable, so pin this to Tether's data dir.
-    xdg_data_home = Path(settings.data_dir()) / "opencode_managed"
-    xdg_data_home.mkdir(parents=True, exist_ok=True)
-    env["XDG_DATA_HOME"] = str(xdg_data_home)
+    # Preserve the user's existing/default XDG data home when it is usable so
+    # OpenCode can see its normal auth/state under ~/.local/share/opencode.
+    # Only fall back to a Tether-owned directory in restricted environments
+    # where the effective data home is not writable or cannot be created.
+    fallback_xdg_data_home = _resolve_managed_xdg_data_home(env)
+    if fallback_xdg_data_home:
+        env["XDG_DATA_HOME"] = fallback_xdg_data_home
 
     logger.info("Starting managed OpenCode sidecar", cmd=parts)
     try:
@@ -209,3 +212,42 @@ def _resolve_sidecar_command() -> list[str]:
         "Could not find OpenCode sidecar bundle or source directory. "
         "Run scripts/build-sidecars.sh or set TETHER_OPENCODE_SIDECAR_CMD."
     )
+
+
+def _resolve_managed_xdg_data_home(env: Mapping[str, str]) -> str | None:
+    """Return a fallback XDG_DATA_HOME for managed sidecars when needed.
+
+    When the user's configured/default data home is writable, return ``None``
+    so OpenCode keeps using its normal state directory. Falling back to
+    Tether-owned storage is only needed in restricted environments.
+    """
+
+    configured = env.get("XDG_DATA_HOME", "").strip()
+    effective_data_home = (
+        Path(configured).expanduser()
+        if configured
+        else Path.home() / ".local" / "share"
+    )
+
+    if _is_writable_or_creatable_dir(effective_data_home):
+        return None
+
+    fallback = Path(settings.data_dir()) / "opencode_managed"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return str(fallback)
+
+
+def _is_writable_or_creatable_dir(path: Path) -> bool:
+    """Return True when ``path`` can store OpenCode state."""
+
+    try:
+        if path.exists():
+            return path.is_dir() and os.access(path, os.W_OK | os.X_OK)
+
+        parent = path.parent
+        while parent != parent.parent and not parent.exists():
+            parent = parent.parent
+
+        return parent.is_dir() and os.access(parent, os.W_OK | os.X_OK)
+    except OSError:
+        return False
