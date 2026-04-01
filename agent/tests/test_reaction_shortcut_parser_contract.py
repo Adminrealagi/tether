@@ -5,6 +5,10 @@ from unittest.mock import AsyncMock
 import pytest
 
 from agent_tether.base import BridgeCallbacks
+from tether.bridges.reaction_shortcuts import (
+    parse_reaction_shortcut_message,
+    reaction_matches,
+)
 
 
 def _mock_callbacks(**overrides) -> BridgeCallbacks:
@@ -76,3 +80,19 @@ async def test_thread_seeded_reaction_contract_reuses_base_directory_for_agent_o
 
     assert adapter == "codex_sdk_sidecar"
     assert directory == "/worktrees/demo"
+
+
+def test_parse_reaction_shortcut_message_extracts_args_and_prompt() -> None:
+    shortcut = parse_reaction_shortcut_message(
+        "!new codex /worktrees/tether\nFix the failing Discord tests."
+    )
+
+    assert shortcut is not None
+    assert shortcut.args == "codex /worktrees/tether"
+    assert shortcut.prompt == "Fix the failing Discord tests."
+
+
+def test_reaction_matches_accepts_slack_and_discord_checkmark_forms() -> None:
+    assert reaction_matches("✅", "white_check_mark") is True
+    assert reaction_matches("white_check_mark", "✅") is True
+    assert reaction_matches("✅", "eyes") is False
