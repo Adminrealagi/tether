@@ -34,6 +34,7 @@ vi.mock("./settings.js", () => ({
   settings: {
     opencodeBin: () => undefined,
     turnTimeoutSeconds: () => timeoutSeconds,
+    serverStartupTimeoutMs: () => 15000,
     logLevel: () => "silent",
     logPretty: () => false,
   },

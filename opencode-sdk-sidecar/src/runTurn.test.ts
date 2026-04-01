@@ -37,6 +37,7 @@ vi.mock("./settings.js", () => ({
   settings: {
     opencodeBin: () => undefined,
     turnTimeoutSeconds: () => 0,
+    serverStartupTimeoutMs: () => 15000,
     logLevel: () => "silent",
     logPretty: () => false,
   },
@@ -297,6 +298,22 @@ describe("runTurn — abort handling", () => {
 });
 
 describe("runTurn — ensureServer (via runTurn)", () => {
+  it("passes the configured startup timeout to createOpencodeServer", async () => {
+    const { createOpencodeServer } = await import("@opencode-ai/sdk");
+    const { runTurn } = await import("./opencode.js");
+    const session = createTestSession();
+
+    await runTurn(session, "hello", 2);
+    await vi.runAllTimersAsync();
+
+    expect(createOpencodeServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hostname: "127.0.0.1",
+        timeout: 15000,
+      }),
+    );
+  });
+
   it("reuses existing server handle when workdir matches", async () => {
     const { createOpencodeServer } = await import("@opencode-ai/sdk");
     const { runTurn } = await import("./opencode.js");
@@ -367,5 +384,4 @@ describe("runTurn — ensureServer (via runTurn)", () => {
     expect(mockSessionCreate.mock.calls.length).toBe(createCallsAfterFirst);
   });
 });
-
 

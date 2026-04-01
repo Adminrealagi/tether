@@ -192,6 +192,7 @@ async function ensureServer(
     hostname: "127.0.0.1",
     // Use a random port so multiple sessions don't collide.
     port: await getFreePort(),
+    timeout: settings.serverStartupTimeoutMs(),
   });
 
   // createOpencodeClient connects to the running server.

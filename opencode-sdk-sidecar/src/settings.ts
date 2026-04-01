@@ -32,6 +32,7 @@ export const settings = {
   logPretty: () => getBool("TETHER_OPENCODE_SIDECAR_LOG_PRETTY"),
 
   turnTimeoutSeconds: () => getInt("TETHER_OPENCODE_SIDECAR_TURN_TIMEOUT_SECONDS", 0),
+  serverStartupTimeoutMs: () => getInt("TETHER_OPENCODE_SIDECAR_STARTUP_TIMEOUT_MS", 15000),
 
   /** Path to the opencode binary (default: auto-detect). */
   opencodeBin: (): string | undefined => get("OPENCODE_BIN") || undefined,
