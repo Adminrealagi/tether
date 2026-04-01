@@ -36,6 +36,7 @@ class DiscordConfig:
 
     require_pairing: bool = False
     allowed_user_ids: list[int] | None = None
+    auto_pair_user_ids: list[int] | None = None
     pairing_code: str | None = None
     guild_id: int = 0
 
@@ -72,8 +73,20 @@ class DiscordBridge(UpstreamDiscordBridge):
             discord_config=upstream_config,
             **kwargs,
         )
+        raw_auto_pair_ids = getattr(local_config, "auto_pair_user_ids", None) or []
+        auto_pair_user_ids: set[int] = set()
+        for user_id in raw_auto_pair_ids:
+            raw_user_id = str(user_id).strip()
+            if not raw_user_id:
+                continue
+            try:
+                auto_pair_user_ids.add(int(raw_user_id))
+            except ValueError:
+                continue
+        self._auto_pair_user_ids = auto_pair_user_ids
         self._guild_id = int(getattr(local_config, "guild_id", 0) or 0)
         self._control_channel_name = f"🤖-{_hostname_slug()}"
+        self._apply_auto_pair_users()
 
     async def create_thread(self, session_id: str, session_name: str) -> dict:
         if not self._client:
@@ -104,6 +117,23 @@ class DiscordBridge(UpstreamDiscordBridge):
         self._pairing_state.control_channel_id = int(self._channel_id)
         self._pairing_state.paired_user_ids = set(self._paired_user_ids)
         save_pairing_state(path=self._pairing_state_path, state=self._pairing_state)
+
+    def _apply_auto_pair_users(self) -> None:
+        if not self._auto_pair_user_ids:
+            return
+        self._ensure_pairing_state_loaded()
+        if self._pairing_state is None:
+            return
+        before = set(self._paired_user_ids)
+        self._paired_user_ids.update(self._auto_pair_user_ids)
+        if self._paired_user_ids == before:
+            return
+        self._pairing_state.paired_user_ids = set(self._paired_user_ids)
+        save_pairing_state(path=self._pairing_state_path, state=self._pairing_state)
+        logger.info(
+            "Auto-paired Discord users from configuration",
+            auto_pair_count=len(self._auto_pair_user_ids),
+        )
 
     async def _resolve_bootstrap_guild(self) -> Any | None:
         if not self._client:

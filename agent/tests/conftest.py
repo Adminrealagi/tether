@@ -25,6 +25,7 @@ for k in (
     "DISCORD_REQUIRE_PAIRING",
     "DISCORD_PAIRING_CODE",
     "DISCORD_ALLOWED_USER_IDS",
+    "DISCORD_AUTO_PAIR_USER_IDS",
 ):
     os.environ.pop(k, None)
 

@@ -1,5 +1,6 @@
 """Tests for Discord bridge (Phase 5 PoC)."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -643,6 +644,40 @@ class TestDiscordBridgePoC:
 
         await bridge._dispatch_command(mock_message, "!status")
         callbacks.list_sessions.assert_called_once()
+
+    @pytest.mark.anyio
+    async def test_auto_pair_user_ids_authorize_commands(
+        self, tmp_path
+    ) -> None:
+        from agent_tether.base import BridgeConfig
+        from tether.bridges.discord.bot import DiscordBridge, DiscordConfig
+
+        callbacks = _mock_callbacks()
+        bridge = DiscordBridge(
+            bot_token="x",
+            channel_id=1234567890,
+            discord_config=DiscordConfig(
+                require_pairing=True,
+                auto_pair_user_ids=[222],
+            ),
+            callbacks=callbacks,
+            config=BridgeConfig(data_dir=str(tmp_path)),
+        )
+
+        mock_channel = AsyncMock()
+        mock_channel.id = 1234567890
+        mock_message = MagicMock()
+        mock_message.channel = mock_channel
+        mock_message.guild = MagicMock()
+        mock_message.author.id = 222
+        mock_message.author.name = "testuser"
+
+        await bridge._dispatch_command(mock_message, "!status")
+
+        assert 222 in bridge._paired_user_ids
+        callbacks.list_sessions.assert_called_once()
+        pairing_payload = json.loads((tmp_path / "discord_pairing.json").read_text("utf-8"))
+        assert pairing_payload["paired_user_ids"] == [222]
 
     @pytest.mark.anyio
     async def test_setup_command_sets_control_channel_and_pairs_user(

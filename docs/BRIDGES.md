@@ -95,6 +95,7 @@ Stored in base class as in-memory dicts:
 | `DISCORD_REQUIRE_PAIRING` | Require pairing before using the Discord bot (0/1) |
 | `DISCORD_PAIRING_CODE` | Optional fixed pairing code (if unset and pairing is required, one is generated and logged) |
 | `DISCORD_ALLOWED_USER_IDS` | Comma-separated Discord user IDs that are always authorized |
+| `DISCORD_AUTO_PAIR_USER_IDS` | Comma-separated Discord user IDs to seed into the paired-user set at launch |
 
 Bridges auto-initialize in `main.py` lifespan if tokens are configured.
 

@@ -152,6 +152,7 @@ async def _init_bridges() -> None:
                 discord_config=DiscordConfig(
                     require_pairing=settings.discord_require_pairing(),
                     allowed_user_ids=settings.discord_allowed_user_ids(),
+                    auto_pair_user_ids=settings.discord_auto_pair_user_ids(),
                     pairing_code=settings.discord_pairing_code(),
                     guild_id=settings.discord_guild_id(),
                 ),
@@ -294,7 +295,7 @@ def run() -> None:
                 logger.error(
                     "Port already in use. Is Tether already running?",
                     port=port,
-                    hint=f"Stop the other process or use: tether start --port <other>",
+                    hint="Stop the other process or use: tether start --port <other>",
                 )
                 sys.exit(1)
         raise

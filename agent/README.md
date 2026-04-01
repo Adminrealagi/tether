@@ -183,7 +183,7 @@ Platforms:
 3. In Telegram: run `/list`, then `/attach <number>`
 4. In Slack/Discord: run `!list`, then `!attach <number>`
 
-If Discord only has `DISCORD_GUILD_ID` configured, Tether will automatically create or reuse a control channel named for the local host, for example `🤖-kali14`, and then create per-session threads from there.
+If Discord only has `DISCORD_GUILD_ID` configured, Tether will automatically create or reuse a control channel named for the local host, for example `🤖-kali14`, and then create per-session threads from there. If pairing is enabled, `DISCORD_AUTO_PAIR_USER_IDS` can pre-authorize specific Discord user IDs at launch so they can use the bot immediately.
 
 That creates a per session thread (topic or thread) where output streams live and approvals show up as buttons or text prompts.
 
