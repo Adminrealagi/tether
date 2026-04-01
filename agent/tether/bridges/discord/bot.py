@@ -1,20 +1,27 @@
-"""Repo-owned Discord bridge wrapper with control-channel bootstrap."""
+"""Tether-local Discord bridge compatibility wrapper.
+
+Keep the upstream ``agent_tether`` bridge as the source of truth for Discord
+behavior, but override thread creation for text channels so new session threads
+are public and discoverable in the configured control channel.
+"""
 
 from __future__ import annotations
 
-import asyncio
+from dataclasses import dataclass
 import re
 import socket
-from dataclasses import dataclass
 from typing import Any
 
 import structlog
 from agent_tether.discord.bot import DiscordBridge as UpstreamDiscordBridge
 from agent_tether.discord.bot import DiscordConfig as UpstreamDiscordConfig
+from agent_tether.discord.pairing_state import save as save_pairing_state
 
 logger = structlog.get_logger(__name__)
 
-_CONTROL_CHANNEL_EMOJI = "🤖"
+_DISCORD_THREAD_NAME_LIMIT = 100
+_DISCORD_STARTER_TEXT_LIMIT = 2000
+_DISCORD_AUTO_ARCHIVE_MINUTES = 1440
 
 
 def _hostname_slug() -> str:
@@ -25,7 +32,7 @@ def _hostname_slug() -> str:
 
 @dataclass
 class DiscordConfig:
-    """Discord-specific configuration owned by the Tether repo."""
+    """Tether-local Discord config compatibility shim."""
 
     require_pairing: bool = False
     allowed_user_ids: list[int] | None = None
@@ -34,7 +41,17 @@ class DiscordConfig:
 
 
 class DiscordBridge(UpstreamDiscordBridge):
-    """Discord bridge with automatic host-named control channel bootstrap."""
+    """Compatibility wrapper for the upstream Discord bridge.
+
+    Upstream ``channel.create_thread(...)`` creates private threads when the
+    configured control channel is a regular Discord text channel. Those private
+    threads are effectively invisible in the machine channel, which makes the
+    Discord surface look empty. Tether needs visible public threads there.
+
+    For text channels, create a starter message and open the thread from that
+    message so Discord treats it as a public thread. For any other channel type,
+    fall back to upstream behavior unchanged.
+    """
 
     def __init__(
         self,
@@ -56,7 +73,29 @@ class DiscordBridge(UpstreamDiscordBridge):
             **kwargs,
         )
         self._guild_id = int(getattr(local_config, "guild_id", 0) or 0)
-        self._control_channel_name = f"{_CONTROL_CHANNEL_EMOJI}-{_hostname_slug()}"
+        self._control_channel_name = f"🤖-{_hostname_slug()}"
+
+    async def create_thread(self, session_id: str, session_name: str) -> dict:
+        if not self._client:
+            raise RuntimeError("Discord client not initialized")
+
+        channel = await self._ensure_control_channel()
+        if not channel:
+            raise RuntimeError(f"Discord channel {self._channel_id} not found")
+
+        if hasattr(channel, "send"):
+            return await self._create_public_thread_from_message(
+                session_id=session_id,
+                session_name=session_name,
+                channel=channel,
+            )
+
+        logger.info(
+            "Falling back to upstream Discord thread creation",
+            session_id=session_id,
+            channel_id=self._channel_id,
+        )
+        return await super().create_thread(session_id, session_name)
 
     def _persist_control_channel(self) -> None:
         self._ensure_pairing_state_loaded()
@@ -64,11 +103,12 @@ class DiscordBridge(UpstreamDiscordBridge):
             return
         self._pairing_state.control_channel_id = int(self._channel_id)
         self._pairing_state.paired_user_ids = set(self._paired_user_ids)
-        from agent_tether.discord.pairing_state import save as save_pairing_state
-
         save_pairing_state(path=self._pairing_state_path, state=self._pairing_state)
 
     async def _resolve_bootstrap_guild(self) -> Any | None:
+        if not self._client:
+            return None
+
         guilds = list(getattr(self._client, "guilds", []) or [])
         if self._guild_id:
             guild = self._client.get_guild(self._guild_id)
@@ -79,14 +119,17 @@ class DiscordBridge(UpstreamDiscordBridge):
                     guild_count=len(guilds),
                 )
             return guild
+
         if len(guilds) == 1:
             return guilds[0]
+
         if len(guilds) > 1:
             logger.warning(
                 "Discord control channel bootstrap needs DISCORD_GUILD_ID when the bot is in multiple guilds",
                 guild_count=len(guilds),
             )
             return None
+
         logger.warning("Discord control channel bootstrap found no accessible guilds")
         return None
 
@@ -95,35 +138,37 @@ class DiscordBridge(UpstreamDiscordBridge):
             return None
 
         if self._channel_id:
-            cached = self._client.get_channel(self._channel_id)
-            if cached is not None:
-                return cached
-            try:
-                fetched = await self._client.fetch_channel(self._channel_id)
-            except Exception:
-                logger.warning(
-                    "Configured Discord control channel is not accessible; retrying bootstrap",
-                    channel_id=self._channel_id,
-                )
-                self._channel_id = 0
-            else:
-                return fetched
+            channel = self._client.get_channel(self._channel_id)
+            if channel is not None:
+                return channel
+            fetch_channel = getattr(self._client, "fetch_channel", None)
+            if fetch_channel is not None:
+                try:
+                    channel = await fetch_channel(self._channel_id)
+                except Exception:
+                    logger.warning(
+                        "Configured Discord control channel is not accessible; retrying bootstrap",
+                        channel_id=self._channel_id,
+                    )
+                else:
+                    return channel
 
         guild = await self._resolve_bootstrap_guild()
         if guild is None:
             return None
 
         for channel in getattr(guild, "text_channels", []) or []:
-            if getattr(channel, "name", None) == self._control_channel_name:
-                self._channel_id = int(channel.id)
-                self._persist_control_channel()
-                logger.info(
-                    "Using existing Discord control channel",
-                    guild_id=getattr(guild, "id", 0),
-                    channel_id=self._channel_id,
-                    channel_name=self._control_channel_name,
-                )
-                return channel
+            if getattr(channel, "name", None) != self._control_channel_name:
+                continue
+            self._channel_id = int(channel.id)
+            self._persist_control_channel()
+            logger.info(
+                "Using existing Discord control channel",
+                guild_id=getattr(guild, "id", 0),
+                channel_id=self._channel_id,
+                channel_name=self._control_channel_name,
+            )
+            return channel
 
         topic = (
             f"Tether control channel for {socket.gethostname().split('.', 1)[0]}. "
@@ -143,69 +188,26 @@ class DiscordBridge(UpstreamDiscordBridge):
         )
         return channel
 
-    async def start(self) -> None:
-        """Initialize and start the Discord client with channel bootstrap."""
-        try:
-            import discord
-        except ImportError:
-            logger.error("discord.py not installed. Install with: pip install discord.py")
-            return
-
-        intents = discord.Intents.default()
-        intents.message_content = True
-        self._client = discord.Client(intents=intents)
-
-        @self._client.event
-        async def on_ready() -> None:
-            logger.info("Discord client ready", user=self._client.user)
-            try:
-                await self._ensure_control_channel()
-            except Exception:
-                logger.exception("Failed to bootstrap Discord control channel")
-
-        @self._client.event
-        async def on_message(message: Any) -> None:
-            await self._handle_message(message)
-
-        asyncio.create_task(self._client.start(self._bot_token))
-
-        logger.info(
-            "Discord bridge initialized and starting",
-            channel_id=self._channel_id,
-            guild_id=self._guild_id,
-        )
-        if not self._channel_id and self._guild_id:
-            logger.info(
-                "Discord bridge will auto-create or reuse the hostname control channel",
-                guild_id=self._guild_id,
-                channel_name=self._control_channel_name,
-            )
-        elif not self._channel_id and self._pairing_code:
-            logger.warning(
-                "Discord bridge not configured with a control channel. Run !setup <code> in the desired channel.",
-                code=self._pairing_code,
-            )
-        elif self._pairing_required and self._pairing_code:
-            logger.warning(
-                "Discord pairing enabled. DM the bot: !pair <code>",
-                code=self._pairing_code,
-            )
-
-    async def create_thread(self, session_id: str, session_name: str) -> dict:
-        """Create a Discord thread, bootstrapping the control channel if needed."""
-        if not self._client:
-            raise RuntimeError("Discord client not initialized")
-
-        channel = await self._ensure_control_channel()
-        if channel is None:
-            raise RuntimeError("Discord control channel is not configured")
-
+    async def _create_public_thread_from_message(
+        self,
+        *,
+        session_id: str,
+        session_name: str,
+        channel: Any,
+    ) -> dict:
         try:
             self._reserve_thread_name(session_id, session_name)
 
-            thread = await channel.create_thread(
-                name=session_name[:100],
-                auto_archive_duration=1440,
+            starter_text = (
+                f"🧵 Tether session: **{session_name[:80]}**\n"
+                "This starter message keeps the thread visible in this machine channel."
+            )
+            starter_message = await channel.send(
+                starter_text[:_DISCORD_STARTER_TEXT_LIMIT]
+            )
+            thread = await starter_message.create_thread(
+                name=session_name[:_DISCORD_THREAD_NAME_LIMIT],
+                auto_archive_duration=_DISCORD_AUTO_ARCHIVE_MINUTES,
             )
 
             thread_id = thread.id
@@ -219,19 +221,20 @@ class DiscordBridge(UpstreamDiscordBridge):
                 pass
 
             logger.info(
-                "Created Discord thread",
+                "Created visible Discord thread",
                 session_id=session_id,
                 thread_id=thread_id,
                 name=session_name,
                 channel_id=self._channel_id,
             )
-
             return {
                 "thread_id": str(thread_id),
                 "platform": "discord",
             }
         except Exception as exc:
-            logger.exception("Failed to create Discord thread", session_id=session_id)
+            logger.exception(
+                "Failed to create visible Discord thread", session_id=session_id
+            )
             if self._thread_names.get(session_id) == session_name:
                 self._release_thread_name(session_id)
-            raise RuntimeError(f"Failed to create Discord thread: {exc}")
+            raise RuntimeError(f"Failed to create Discord thread: {exc}") from exc

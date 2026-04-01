@@ -89,9 +89,11 @@ class TestDiscordBridgePoC:
         # Mock Discord client
         mock_client = MagicMock()
         mock_channel = AsyncMock()
+        mock_starter_message = AsyncMock()
         mock_thread = MagicMock()
         mock_thread.id = 9876543210
-        mock_channel.create_thread.return_value = mock_thread
+        mock_starter_message.create_thread.return_value = mock_thread
+        mock_channel.send.return_value = mock_starter_message
         mock_client.get_channel.return_value = mock_channel
 
         bridge = DiscordBridge(
@@ -103,9 +105,44 @@ class TestDiscordBridgePoC:
         # Create thread
         result = await bridge.create_thread(session.id, "Test Session")
 
-        # Verify thread was created
-        assert mock_channel.create_thread.called
+        # Verify a visible thread was created from a starter message
+        assert mock_channel.send.called
+        assert mock_starter_message.create_thread.called
         assert result["thread_id"] == "9876543210"
+        assert result["platform"] == "discord"
+
+    @pytest.mark.anyio
+    async def test_create_thread_fetches_preconfigured_channel_when_cache_empty(
+        self, fresh_store: SessionStore
+    ) -> None:
+        """Preconfigured control channels do not rely on Discord cache warmup."""
+        from tether.bridges.discord.bot import DiscordBridge
+
+        session = fresh_store.create_session("repo_test", "main")
+
+        mock_client = MagicMock()
+        fetched_channel = AsyncMock()
+        fetched_channel.id = 1234567890
+        mock_starter_message = AsyncMock()
+        mock_thread = MagicMock()
+        mock_thread.id = 222333444
+        mock_starter_message.create_thread.return_value = mock_thread
+        fetched_channel.send.return_value = mock_starter_message
+        mock_client.get_channel.return_value = None
+        mock_client.fetch_channel = AsyncMock(return_value=fetched_channel)
+
+        bridge = DiscordBridge(
+            bot_token="discord_bot_token",
+            channel_id=1234567890,
+        )
+        bridge._client = mock_client
+
+        result = await bridge.create_thread(session.id, "Fetched Channel Session")
+
+        mock_client.fetch_channel.assert_awaited_once_with(1234567890)
+        fetched_channel.send.assert_awaited_once()
+        mock_starter_message.create_thread.assert_awaited_once()
+        assert result["thread_id"] == "222333444"
         assert result["platform"] == "discord"
 
     @pytest.mark.anyio
@@ -190,9 +227,11 @@ class TestDiscordBridgePoC:
         control_channel = AsyncMock()
         control_channel.id = 1001
         control_channel.name = "🤖-thinkpad1"
+        starter_message = AsyncMock()
         thread = MagicMock()
         thread.id = 2002
-        control_channel.create_thread.return_value = thread
+        starter_message.create_thread.return_value = thread
+        control_channel.send.return_value = starter_message
 
         mock_guild = MagicMock()
         mock_guild.id = 8080
@@ -213,7 +252,8 @@ class TestDiscordBridgePoC:
         result = await bridge.create_thread(session.id, "Test Session")
 
         assert bridge._channel_id == 1001
-        control_channel.create_thread.assert_awaited_once()
+        control_channel.send.assert_awaited_once()
+        starter_message.create_thread.assert_awaited_once()
         assert result["thread_id"] == "2002"
 
     @pytest.mark.anyio
@@ -226,9 +266,11 @@ class TestDiscordBridgePoC:
         # Mock Discord client
         mock_client = MagicMock()
         mock_channel = AsyncMock()
+        mock_starter_message = AsyncMock()
         mock_thread = MagicMock()
         mock_thread.id = 111
-        mock_channel.create_thread.return_value = mock_thread
+        mock_starter_message.create_thread.return_value = mock_thread
+        mock_channel.send.return_value = mock_starter_message
         mock_client.get_channel.return_value = mock_channel
 
         bridge = DiscordBridge(
@@ -238,18 +280,52 @@ class TestDiscordBridgePoC:
         )
         bridge._client = mock_client
 
-        name1 = bridge._make_external_thread_name(directory="/repo", session_id="sess_1")
+        name1 = bridge._make_external_thread_name(
+            directory="/repo", session_id="sess_1"
+        )
         await bridge.create_thread("sess_1", name1)
 
         mock_thread_2 = MagicMock()
         mock_thread_2.id = 222
-        mock_channel.create_thread.return_value = mock_thread_2
+        mock_starter_message_2 = AsyncMock()
+        mock_starter_message_2.create_thread.return_value = mock_thread_2
+        mock_channel.send.return_value = mock_starter_message_2
 
-        name2 = bridge._make_external_thread_name(directory="/repo", session_id="sess_2")
+        name2 = bridge._make_external_thread_name(
+            directory="/repo", session_id="sess_2"
+        )
         await bridge.create_thread("sess_2", name2)
 
         assert name1 == "Repo"
         assert name2 == "Repo 2"
+
+    @pytest.mark.anyio
+    async def test_create_thread_falls_back_for_non_text_channels(
+        self, fresh_store: SessionStore
+    ) -> None:
+        """Non-text Discord channels still use the upstream thread creation path."""
+        from tether.bridges.discord.bot import DiscordBridge
+
+        session = fresh_store.create_session("repo_test", "main")
+
+        mock_client = MagicMock()
+        mock_channel = object()
+        mock_client.get_channel.return_value = mock_channel
+
+        bridge = DiscordBridge(
+            bot_token="discord_bot_token",
+            channel_id=1234567890,
+        )
+        bridge._client = mock_client
+
+        with patch(
+            "agent_tether.discord.bot.DiscordBridge.create_thread",
+            new=AsyncMock(return_value={"thread_id": "321", "platform": "discord"}),
+        ) as create_thread:
+            result = await bridge.create_thread(session.id, "Fallback Session")
+
+        assert create_thread.await_count == 1
+        assert result["thread_id"] == "321"
 
     @pytest.mark.anyio
     async def test_on_status_change_sends_to_discord(
@@ -626,9 +702,10 @@ class TestDiscordBridgePoC:
         # Stop typing indicator
         await bridge.on_typing_stopped(session.id)
         assert session.id not in bridge._typing_tasks
-        
+
         # Give the task a moment to cancel
         import asyncio
+
         await asyncio.sleep(0.01)
         assert typing_task.cancelled() or typing_task.done()
 
