@@ -101,13 +101,37 @@ async def test_attach_codex_session(
 
 
 @pytest.mark.anyio
-async def test_attach_codex_without_sidecar_url_returns_400(
+async def test_list_codex_sessions_without_sidecar_url(
+    api_client: httpx.AsyncClient,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Codex discovery should not depend on an explicit sidecar URL."""
+    codex_home = tmp_path / ".codex"
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    monkeypatch.delenv("TETHER_CODEX_SIDECAR_URL", raising=False)
+
+    session_id = "019b2182-8e89-77a1-a675-72857fca4fb1"
+    rollout_path = codex_home / "sessions" / "2026" / "02" / "06" / f"rollout-2026-02-06T20-00-00-{session_id}.jsonl"
+    _write_rollout(rollout_path, session_id)
+
+    response = await api_client.get("/api/external-sessions?runner_type=codex&limit=5")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["id"] == session_id
+    assert payload[0]["runner_type"] == "codex"
+
+
+@pytest.mark.anyio
+async def test_attach_codex_without_sidecar_url_succeeds(
     api_client: httpx.AsyncClient,
     fresh_store: SessionStore,
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    """Attaching to Codex sessions without TETHER_CODEX_SIDECAR_URL should fail."""
+    """Attaching to Codex sessions should preserve history even before sidecar startup."""
     codex_home = tmp_path / ".codex"
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
     monkeypatch.delenv("TETHER_CODEX_SIDECAR_URL", raising=False)
@@ -131,9 +155,11 @@ async def test_attach_codex_without_sidecar_url_returns_400(
         },
     )
 
-    assert response.status_code == 400, f"Expected 400, got {response.status_code}: {response.text}"
+    assert response.status_code == 201, f"Expected 201, got {response.status_code}: {response.text}"
     body = response.json()
-    assert "sidecar" in str(body).lower(), f"Expected 'sidecar' in response: {body}"
+    assert body["runner_type"] == "codex"
+    assert body["adapter"] == "codex_sdk_sidecar"
+    assert body["runner_session_id"] == session_id
 
 
 @pytest.mark.anyio
