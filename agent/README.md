@@ -61,6 +61,12 @@ tether init
 tether start
 ```
 
+For Discord voice support without the runtime `PyNaCl` / `davey` warnings, install the Discord extra:
+
+```bash
+pipx install "tether-ai[discord]"
+```
+
 Then open `http://localhost:8787`.
 
 The `init` wizard generates an auth token, detects your `claude` CLI, and optionally
@@ -191,6 +197,8 @@ Install bridge dependencies:
 ```bash
 pip install tether-ai[telegram]   # or [slack] or [discord]
 ```
+
+The `discord` extra now installs `discord.py[voice]`, so source installs through `make install` / `make install-all` also bring in the voice-support dependencies automatically.
 
 Install SSH support:
 ```bash

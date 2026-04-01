@@ -53,6 +53,12 @@ tether new . -m "fix the failing tests"  # create and start immediately
 pipx install tether-ai
 ```
 
+If you want Discord voice support and do not want startup warnings about missing audio dependencies, install the Discord extra:
+
+```bash
+pipx install "tether-ai[discord]"
+```
+
 Bridge dependencies are optional extras:
 
 ```bash
@@ -90,6 +96,8 @@ make install-system   # optional: refresh ~/.local/bin/tether from this checkout
 cp .env.example .env
 make start
 ```
+
+`make install` and `make install-all` both include the Discord voice dependency path for source installs now, so the local repo workflow does not leave `PyNaCl` / `davey` warnings behind by default.
 
 ## Attaching external sessions
 

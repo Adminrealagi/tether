@@ -67,7 +67,7 @@ slack = [
   "slack-sdk>=3.27.0",
 ]
 discord = [
-  "discord.py>=2.3.0",
+  "discord.py[voice]>=2.7.1",
 ]
 ssh = [
   "asyncssh>=2.14.2",

@@ -24,7 +24,7 @@ help:
 	@echo "  make clean        - Remove build artifacts and caches"
 
 install:
-	pip install -e .
+	pip install -e ".[discord]"
 
 install-all:
 	pip install -e ".[dev,telegram,slack,discord,ssh,litellm,mcp]"

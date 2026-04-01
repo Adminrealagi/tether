@@ -15,7 +15,7 @@ venv: $(PYTHON)
 
 # Install dependencies (run once)
 install: venv
-	cd agent && $(PIP) install -e ".[dev]"
+	cd agent && $(PIP) install -e ".[dev,discord]"
 	cd ui && npm ci
 	npm install --workspaces
 
