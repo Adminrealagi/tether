@@ -112,9 +112,10 @@ Configure credentials in `~/.config/tether/config.env` (or `.env` in the project
 |----------|--------------|
 | Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_FORUM_GROUP_ID` |
 | Slack    | `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_CHANNEL_ID` |
-| Discord  | `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID` |
+| Discord  | `DISCORD_BOT_TOKEN` plus either `DISCORD_CHANNEL_ID` or `DISCORD_GUILD_ID` |
 
 Telegram requires a supergroup with Topics enabled. Each session gets its own topic. Commands work in the General topic: `/list`, `/attach`, `/new`, `/help`.
+Discord can either reuse a fixed `DISCORD_CHANNEL_ID` or, when `DISCORD_GUILD_ID` is set, automatically create or reuse a host-named control channel such as `🤖-kali14`.
 
 ## SSH access
 

@@ -441,6 +441,20 @@ class Settings:
             return 0
 
     @staticmethod
+    def discord_guild_id() -> int:
+        """Discord guild ID used for automatic control-channel bootstrap.
+
+        Env: DISCORD_GUILD_ID
+        """
+        value = os.environ.get("DISCORD_GUILD_ID", "").strip()
+        if not value:
+            return 0
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+
+    @staticmethod
     def discord_require_pairing() -> bool:
         """Require Discord users to pair before using the bot.
 

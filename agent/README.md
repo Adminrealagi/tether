@@ -168,7 +168,7 @@ credentials in `.env`. The bridge starts automatically.
 Platforms:
 1. Telegram: `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_FORUM_GROUP_ID` (supergroup with topics)
 2. Slack: `SLACK_BOT_TOKEN` plus `SLACK_APP_TOKEN` plus `SLACK_CHANNEL_ID`
-3. Discord: `DISCORD_BOT_TOKEN` plus `DISCORD_CHANNEL_ID`
+3. Discord: `DISCORD_BOT_TOKEN` plus `DISCORD_CHANNEL_ID` or `DISCORD_GUILD_ID`
 
 ### How to use it (2 minutes)
 
@@ -176,6 +176,8 @@ Platforms:
 2. Start Tether: `tether start`
 3. In Telegram: run `/list`, then `/attach <number>`
 4. In Slack/Discord: run `!list`, then `!attach <number>`
+
+If Discord only has `DISCORD_GUILD_ID` configured, Tether will automatically create or reuse a control channel named for the local host, for example `🤖-kali14`, and then create per-session threads from there.
 
 That creates a per session thread (topic or thread) where output streams live and approvals show up as buttons or text prompts.
 

@@ -109,6 +109,114 @@ class TestDiscordBridgePoC:
         assert result["platform"] == "discord"
 
     @pytest.mark.anyio
+    async def test_auto_control_channel_reuses_existing_hostname_channel(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        from tether.bridges.discord.bot import DiscordBridge, DiscordConfig
+        from agent_tether.base import BridgeConfig
+
+        monkeypatch.setattr("tether.bridges.discord.bot.socket.gethostname", lambda: "box4080")
+
+        mock_client = MagicMock()
+        existing_channel = MagicMock()
+        existing_channel.id = 555
+        existing_channel.name = "🤖-box4080"
+        mock_guild = MagicMock()
+        mock_guild.id = 123456
+        mock_guild.text_channels = [existing_channel]
+        mock_client.get_guild.return_value = mock_guild
+        mock_client.guilds = [mock_guild]
+
+        bridge = DiscordBridge(
+            bot_token="discord_bot_token",
+            channel_id=0,
+            discord_config=DiscordConfig(guild_id=123456),
+            config=BridgeConfig(data_dir=str(tmp_path)),
+        )
+        bridge._client = mock_client
+
+        channel = await bridge._ensure_control_channel()
+
+        assert channel is existing_channel
+        assert bridge._channel_id == 555
+        assert not mock_guild.create_text_channel.called
+
+    @pytest.mark.anyio
+    async def test_auto_control_channel_creates_missing_hostname_channel(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        from tether.bridges.discord.bot import DiscordBridge, DiscordConfig
+        from agent_tether.base import BridgeConfig
+
+        monkeypatch.setattr("tether.bridges.discord.bot.socket.gethostname", lambda: "kali14")
+
+        mock_client = MagicMock()
+        created_channel = MagicMock()
+        created_channel.id = 777
+        created_channel.name = "🤖-kali14"
+        mock_guild = MagicMock()
+        mock_guild.id = 654321
+        mock_guild.text_channels = []
+        mock_guild.create_text_channel = AsyncMock(return_value=created_channel)
+        mock_client.get_guild.return_value = mock_guild
+        mock_client.guilds = [mock_guild]
+
+        bridge = DiscordBridge(
+            bot_token="discord_bot_token",
+            channel_id=0,
+            discord_config=DiscordConfig(guild_id=654321),
+            config=BridgeConfig(data_dir=str(tmp_path)),
+        )
+        bridge._client = mock_client
+
+        channel = await bridge._ensure_control_channel()
+
+        assert channel is created_channel
+        assert bridge._channel_id == 777
+        mock_guild.create_text_channel.assert_awaited_once()
+        assert mock_guild.create_text_channel.await_args.kwargs["name"] == "🤖-kali14"
+
+    @pytest.mark.anyio
+    async def test_create_thread_bootstraps_control_channel_when_unset(
+        self, fresh_store: SessionStore, monkeypatch, tmp_path
+    ) -> None:
+        from tether.bridges.discord.bot import DiscordBridge, DiscordConfig
+        from agent_tether.base import BridgeConfig
+
+        monkeypatch.setattr("tether.bridges.discord.bot.socket.gethostname", lambda: "thinkpad1")
+
+        session = fresh_store.create_session("repo_test", "main")
+
+        control_channel = AsyncMock()
+        control_channel.id = 1001
+        control_channel.name = "🤖-thinkpad1"
+        thread = MagicMock()
+        thread.id = 2002
+        control_channel.create_thread.return_value = thread
+
+        mock_guild = MagicMock()
+        mock_guild.id = 8080
+        mock_guild.text_channels = [control_channel]
+
+        mock_client = MagicMock()
+        mock_client.get_guild.return_value = mock_guild
+        mock_client.guilds = [mock_guild]
+
+        bridge = DiscordBridge(
+            bot_token="discord_bot_token",
+            channel_id=0,
+            discord_config=DiscordConfig(guild_id=8080),
+            config=BridgeConfig(data_dir=str(tmp_path)),
+        )
+        bridge._client = mock_client
+
+        result = await bridge.create_thread(session.id, "Test Session")
+
+        assert bridge._channel_id == 1001
+        control_channel.create_thread.assert_awaited_once()
+        assert result["thread_id"] == "2002"
+
+    @pytest.mark.anyio
     async def test_thread_names_are_unique_like_telegram(
         self, fresh_store: SessionStore, tmp_path
     ) -> None:
