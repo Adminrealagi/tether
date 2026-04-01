@@ -62,7 +62,7 @@ vi.mock("../../codex-src/sdk/typescript/src/index.js", () => ({
     startThread: mockStartThread,
     resumeThread: mockResumeThread,
   })),
-}));
+}), { virtual: true });
 
 // Helper to create a test session
 function createTestSession(): SessionState {

@@ -23,6 +23,11 @@ fi
 
 SIDECAR_HOST="${TETHER_CODEX_SIDECAR_HOST:-127.0.0.1}"
 SIDECAR_PORT="${TETHER_CODEX_SIDECAR_PORT:-8788}"
+PYTHON_BIN="${TETHER_PYTHON_BIN:-$ROOT/.venv/bin/python}"
+
+if [[ ! -x "$PYTHON_BIN" ]]; then
+  PYTHON_BIN="$(command -v python3)"
+fi
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "Missing curl. Install it, or replace the health-check in scripts/start-codex-local.sh."
@@ -51,4 +56,4 @@ done
 
 echo "Starting agent (adapter=codex_sdk_sidecar) ..."
 cd "$ROOT/agent"
-TETHER_AGENT_ADAPTER=codex_sdk_sidecar python -m tether.main
+TETHER_AGENT_ADAPTER=codex_sdk_sidecar "$PYTHON_BIN" -m tether.main

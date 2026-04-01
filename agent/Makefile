@@ -27,7 +27,7 @@ install:
 	pip install -e .
 
 install-all:
-	pip install -e ".[dev,telegram,slack,discord,mcp]"
+	pip install -e ".[dev,telegram,slack,discord,ssh,litellm,mcp]"
 
 dev:
 	uvicorn tether.main:app --reload --host 0.0.0.0 --port 8787

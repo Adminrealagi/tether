@@ -83,7 +83,10 @@ Open `http://localhost:8787`.
 ```bash
 git clone https://github.com/larsderidder/tether.git
 cd tether
-make install
+make install-all
+make test-all
+make build
+make install-system   # optional: refresh ~/.local/bin/tether from this checkout
 cp .env.example .env
 make start
 ```
@@ -237,12 +240,19 @@ See [.env.example](/home/standart/subprojects/tether/.env.example) and [docs/SSH
 ## Development
 
 ```bash
-make install    # Python + Node dependencies
-make start      # build UI and start
-make dev-ui     # hot-reload UI dev server (run agent separately)
-make test       # pytest
-make verify     # health check
+make install         # create .venv, install Python dev deps, UI deps, sidecar workspaces
+make install-all     # install all optional Python runtime extras too
+make test            # pytest only
+make test-all        # pytest + UI + sidecar tests
+make build           # build UI assets and bundled sidecars
+make install-system  # editable pipx install from this checkout
+make start           # build UI and start
+make dev-ui          # hot-reload UI dev server (run agent separately)
+make verify          # health check
 ```
+
+The Codex sidecar bundle is optional. If `codex-src/` is not present, `make build`
+skips that bundle and the sidecar tests still run against mocks.
 
 See `AGENTS.md` and `docs/` for architecture documentation.
 

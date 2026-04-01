@@ -11,7 +11,16 @@
 
 ```bash
 # Install all dependencies
-make install
+make install-all
+
+# Run the full local test matrix
+make test-all
+
+# Build UI assets and sidecar bundles
+make build
+
+# Optional: expose this checkout as ~/.local/bin/tether via pipx
+make install-system
 
 # Terminal 1: Run agent
 cd agent && python -m tether.main
@@ -61,11 +70,15 @@ TETHER_DEFAULT_AGENT_ADAPTER=codex_sdk_sidecar python -m tether.main
 ## Commands
 
 ```bash
-make install      # Install Python and Node dependencies
-make start        # Build UI and run agent
-make start-codex  # Build UI, start sidecar, run agent
-make dev-ui       # Run UI dev server (hot reload)
-make test         # Run agent tests
+make install         # Create .venv, install Python dev deps, UI deps, sidecar workspaces
+make install-all     # Install all optional runtime extras too
+make test            # Run agent tests
+make test-all        # Run Python, UI, and sidecar tests
+make build           # Build UI assets and sidecar bundles
+make install-system  # Editable pipx install from this checkout
+make start           # Build UI and run agent
+make start-codex     # Build UI, start sidecar, run agent
+make dev-ui          # Run UI dev server (hot reload)
 ```
 
 ## Code Style

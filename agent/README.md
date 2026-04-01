@@ -78,7 +78,10 @@ configures a messaging bridge. Config is saved to `~/.config/tether/config.env`.
 ```bash
 git clone https://github.com/larsderidder/tether.git
 cd tether
-make install
+make install-all
+make test-all
+make build
+make install-system   # optional: refresh ~/.local/bin/tether from this checkout
 cp .env.example .env
 make start
 ```
@@ -276,11 +279,15 @@ timeouts, logging, and bridge configuration.
 ## Development
 
 ```bash
-make install    # Install Python + Node dependencies
-make start      # Build UI and run agent
-make dev-ui     # Run UI dev server (hot reload); run agent separately
-make test       # Run pytest
-make verify     # Health check
+make install         # Create .venv, install Python dev deps, UI deps, sidecar workspaces
+make install-all     # Install all optional runtime extras too
+make test            # Run pytest
+make test-all        # Run Python, UI, and sidecar tests
+make build           # Build UI assets and sidecar bundles
+make install-system  # Editable pipx install from this checkout
+make start           # Build UI and run agent
+make dev-ui          # Run UI dev server (hot reload); run agent separately
+make verify          # Health check
 ```
 
 See `AGENTS.md` for full developer docs and `docs/` for architecture documentation.
