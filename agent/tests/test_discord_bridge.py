@@ -1,6 +1,7 @@
 """Tests for Discord bridge (Phase 5 PoC)."""
 
 import json
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -77,6 +78,86 @@ class TestDiscordBridgePoC:
 
         # Verify message was sent to Discord thread
         assert mock_thread.send.called
+
+    @pytest.mark.anyio
+    async def test_on_output_uploads_local_image_links_for_final_messages(
+        self, fresh_store: SessionStore, monkeypatch, tmp_path: Path
+    ) -> None:
+        """Final Discord output uploads local image links as attachments."""
+        from tether.bridges.discord.bot import DiscordBridge
+
+        session = fresh_store.create_session("repo_test", "main")
+        session.platform = "discord"
+        session.platform_thread_id = "9876543210"
+        fresh_store.update_session(session)
+
+        image_path = tmp_path / "sample.png"
+        image_path.write_bytes(b"\x89PNG\r\n\x1a\nsample")
+
+        mock_client = MagicMock()
+        mock_thread = AsyncMock()
+        mock_client.get_channel.return_value = mock_thread
+
+        class _FakeDiscord:
+            @staticmethod
+            def File(path: str, filename: str) -> dict[str, str]:
+                return {"path": path, "filename": filename}
+
+        monkeypatch.setitem(__import__("sys").modules, "discord", _FakeDiscord)
+
+        bridge = DiscordBridge(
+            bot_token="discord_bot_token",
+            channel_id=1234567890,
+        )
+        bridge._client = mock_client
+        bridge._thread_ids[session.id] = 9876543210
+
+        text = f"See screenshot [render]({image_path})"
+        await bridge.on_output(session.id, text, metadata={"final": True, "kind": "final"})
+
+        assert mock_thread.send.await_count == 2
+        attachment_call = mock_thread.send.await_args_list[1]
+        assert attachment_call.kwargs["file"]["path"] == str(image_path)
+        assert attachment_call.kwargs["file"]["filename"] == "sample.png"
+
+    @pytest.mark.anyio
+    async def test_on_output_skips_attachment_upload_for_non_final_messages(
+        self, fresh_store: SessionStore, monkeypatch, tmp_path: Path
+    ) -> None:
+        """Non-final Discord output keeps image links as plain text only."""
+        from tether.bridges.discord.bot import DiscordBridge
+
+        session = fresh_store.create_session("repo_test", "main")
+        session.platform = "discord"
+        session.platform_thread_id = "9876543210"
+        fresh_store.update_session(session)
+
+        image_path = tmp_path / "sample.png"
+        image_path.write_bytes(b"\x89PNG\r\n\x1a\nsample")
+
+        mock_client = MagicMock()
+        mock_thread = AsyncMock()
+        mock_client.get_channel.return_value = mock_thread
+
+        class _FakeDiscord:
+            @staticmethod
+            def File(path: str, filename: str) -> dict[str, str]:
+                return {"path": path, "filename": filename}
+
+        monkeypatch.setitem(__import__("sys").modules, "discord", _FakeDiscord)
+
+        bridge = DiscordBridge(
+            bot_token="discord_bot_token",
+            channel_id=1234567890,
+        )
+        bridge._client = mock_client
+        bridge._thread_ids[session.id] = 9876543210
+
+        text = f"See screenshot [render]({image_path})"
+        await bridge.on_output(session.id, text, metadata={"final": False, "kind": "step"})
+
+        assert mock_thread.send.await_count == 1
+        assert "file" not in mock_thread.send.await_args_list[0].kwargs
 
     @pytest.mark.anyio
     async def test_create_thread_creates_discord_thread(

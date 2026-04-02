@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from pathlib import Path
 import re
 import socket
 from typing import Any
@@ -30,6 +31,9 @@ logger = structlog.get_logger(__name__)
 _DISCORD_THREAD_NAME_LIMIT = 100
 _DISCORD_STARTER_TEXT_LIMIT = 2000
 _DISCORD_AUTO_ARCHIVE_MINUTES = 1440
+_LOCAL_MARKDOWN_LINK_RE = re.compile(r"\[[^\]]+\]\((/[^)\s]+)\)")
+_LOCAL_OBSIDIAN_EMBED_RE = re.compile(r"!\[\[([^\]]+\.(?:png|jpg|jpeg|gif|webp))\]\]", re.IGNORECASE)
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 
 def _hostname_slug() -> str:
@@ -172,6 +176,85 @@ class DiscordBridge(UpstreamDiscordBridge):
             channel_id=self._channel_id,
         )
         return await super().create_thread(session_id, session_name)
+
+    def _extract_local_image_paths(self, text: str) -> list[Path]:
+        candidates: list[Path] = []
+
+        for match in _LOCAL_MARKDOWN_LINK_RE.finditer(text):
+            candidates.append(Path(match.group(1)))
+
+        for match in _LOCAL_OBSIDIAN_EMBED_RE.finditer(text):
+            embed_path = Path(match.group(1))
+            if not embed_path.is_absolute():
+                embed_path = Path.cwd() / embed_path
+            candidates.append(embed_path)
+
+        seen: set[Path] = set()
+        resolved: list[Path] = []
+        for candidate in candidates:
+            suffix = candidate.suffix.lower()
+            if suffix not in _IMAGE_SUFFIXES:
+                continue
+            if not candidate.exists() or not candidate.is_file():
+                continue
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            resolved.append(candidate)
+        return resolved
+
+    async def _send_output_attachments(self, thread: Any, text: str) -> None:
+        image_paths = self._extract_local_image_paths(text)
+        if not image_paths:
+            return
+
+        try:
+            import discord
+        except ImportError:
+            logger.warning("discord.py not installed; skipping attachment upload")
+            return
+
+        for image_path in image_paths:
+            try:
+                await thread.send(file=discord.File(str(image_path), filename=image_path.name))
+            except Exception:
+                logger.exception("Failed to upload Discord attachment", image_path=str(image_path))
+
+    async def on_output(self, session_id: str, text: str, metadata: dict | None = None) -> None:
+        """Send output text to Discord thread, with local image attachments when present."""
+        if not self._client:
+            logger.warning("Discord client not initialized")
+            return
+
+        thread_id = self._thread_ids.get(session_id)
+        if not thread_id:
+            logger.warning("No Discord thread for session", session_id=session_id)
+            return
+
+        try:
+            thread = self._client.get_channel(thread_id)
+            if thread is None:
+                logger.debug(
+                    "Thread not in cache, fetching from API",
+                    session_id=session_id,
+                    thread_id=thread_id,
+                )
+                try:
+                    thread = await self._client.fetch_channel(thread_id)
+                except Exception:
+                    logger.warning(
+                        "Failed to fetch Discord thread",
+                        session_id=session_id,
+                        thread_id=thread_id,
+                    )
+                    return
+            if thread:
+                for i in range(0, len(text), _DISCORD_STARTER_TEXT_LIMIT):
+                    await thread.send(text[i : i + _DISCORD_STARTER_TEXT_LIMIT])
+                if metadata and metadata.get("final"):
+                    await self._send_output_attachments(thread, text)
+        except Exception:
+            logger.exception("Failed to send Discord message", session_id=session_id)
 
     def _persist_control_channel(self) -> None:
         self._ensure_pairing_state_loaded()
